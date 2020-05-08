@@ -11,61 +11,70 @@
 
 namespace Twig\CacheExtension\Node;
 
+use Twig\CacheExtension\Extension;
+use Twig\Compiler;
+use Twig\Node\Expression\AbstractExpression;
+use Twig\Node\Node;
+
 /**
  * Cache twig node.
  *
  * @author Alexander <iam.asm89@gmail.com>
  */
-class CacheNode extends \Twig_Node
+class CacheNode extends Node
 {
     private static $cacheCount = 1;
 
     /**
-     * @param \Twig_Node_Expression $annotation
-     * @param \Twig_Node_Expression $keyInfo
-     * @param \Twig_NodeInterface   $body
-     * @param integer               $lineno
-     * @param string                $tag
+     * @param AbstractExpression $annotation
+     * @param AbstractExpression $keyInfo
+     * @param Node $body
+     * @param integer $lineno
+     * @param string $tag
      */
-    public function __construct(\Twig_Node_Expression $annotation, \Twig_Node_Expression $keyInfo, \Twig_Node $body, $lineno, $tag = null)
-    {
-        parent::__construct(array('key_info' => $keyInfo, 'body' => $body, 'annotation' => $annotation), array(), $lineno, $tag);
+    public function __construct(
+        AbstractExpression $annotation,
+        AbstractExpression $keyInfo,
+        Node $body,
+        $lineno,
+        $tag = null
+    ) {
+        parent::__construct(
+            array('key_info' => $keyInfo, 'body' => $body, 'annotation' => $annotation),
+            array(),
+            $lineno,
+            $tag
+        );
     }
 
     /**
      * {@inheritDoc}
      */
-    public function compile(\Twig_Compiler $compiler)
+    public function compile(Compiler $compiler)
     {
-        $i = self::$cacheCount++;
-
-        if (version_compare(\Twig_Environment::VERSION, '1.26.0', '>=')) {
-            $extension = 'Twig\CacheExtension\Extension';
-        } else {
-            $extension = 'twig_cache';
-        }
+        $i         = self::$cacheCount++;
+        $extension = Extension::class;
 
         $compiler
             ->addDebugInfo($this)
-            ->write("\$twigCacheStrategy".$i." = \$this->env->getExtension('{$extension}')->getCacheStrategy();\n")
-            ->write("\$twigKey".$i." = \$twigCacheStrategy".$i."->generateKey(")
-                ->subcompile($this->getNode('annotation'))
-                ->raw(", ")
-                ->subcompile($this->getNode('key_info'))
+            ->write("\$twigCacheStrategy" . $i . " = \$this->env->getExtension('{$extension}')->getCacheStrategy();\n")
+            ->write("\$twigKey" . $i . " = \$twigCacheStrategy" . $i . "->generateKey(")
+            ->subcompile($this->getNode('annotation'))
+            ->raw(", ")
+            ->subcompile($this->getNode('key_info'))
             ->write(");\n")
-            ->write("\$twigCacheBody".$i." = \$twigCacheStrategy".$i."->fetchBlock(\$twigKey".$i.");\n")
-            ->write("if (\$twigCacheBody".$i." === false) {\n")
+            ->write("\$twigCacheBody" . $i . " = \$twigCacheStrategy" . $i . "->fetchBlock(\$twigKey" . $i . ");\n")
+            ->write("if (\$twigCacheBody" . $i . " === false) {\n")
             ->indent()
-                ->write("ob_start();\n")
-                    ->indent()
-                        ->subcompile($this->getNode('body'))
-                    ->outdent()
-                ->write("\n")
-                ->write("\$twigCacheBody".$i." = ob_get_clean();\n")
-                ->write("\$twigCacheStrategy".$i."->saveBlock(\$twigKey".$i.", \$twigCacheBody".$i.");\n")
+            ->write("ob_start();\n")
+            ->indent()
+            ->subcompile($this->getNode('body'))
+            ->outdent()
+            ->write("\n")
+            ->write("\$twigCacheBody" . $i . " = ob_get_clean();\n")
+            ->write("\$twigCacheStrategy" . $i . "->saveBlock(\$twigKey" . $i . ", \$twigCacheBody" . $i . ");\n")
             ->outdent()
             ->write("}\n")
-            ->write("echo \$twigCacheBody".$i.";\n")
-        ;
+            ->write("echo \$twigCacheBody" . $i . ";\n");
     }
 }

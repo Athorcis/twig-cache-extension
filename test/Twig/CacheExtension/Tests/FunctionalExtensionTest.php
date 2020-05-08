@@ -11,25 +11,42 @@
 
 namespace Twig\CacheExtension\Tests;
 
+use Doctrine\Common\Cache\ArrayCache;
+use PHPUnit\Framework\TestCase;
 use Twig\CacheExtension\CacheProvider\DoctrineCacheAdapter;
-use Twig\CacheExtension\CacheStrategy\KeyGeneratorInterface;
 use Twig\CacheExtension\CacheStrategy\GenerationalCacheStrategy;
 use Twig\CacheExtension\CacheStrategy\IndexedChainingCacheStrategy;
+use Twig\CacheExtension\CacheStrategy\KeyGeneratorInterface;
 use Twig\CacheExtension\CacheStrategy\LifetimeCacheStrategy;
 use Twig\CacheExtension\Extension;
-use Doctrine\Common\Cache\ArrayCache;
-use Twig_Loader_Filesystem;
-use Twig_Environment;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
 
-class FunctionalExtensionTest extends \PHPUnit_Framework_TestCase
+class FunctionalExtensionTest extends TestCase
 {
     private $cache;
 
-    protected function createCacheProvider()
+    public function testCachesWithSameCacheKey()
     {
-        $this->cache = new ArrayCache();
+        $twig = $this->createTwig();
 
-        return new DoctrineCacheAdapter($this->cache);
+        $rendered = $twig->render('gcs_value.twig', array('value' => $this->getValue('asm89', 1)));
+        $this->assertEquals('Hello asm89!', $rendered);
+
+        $rendered2 = $twig->render('gcs_value.twig', array('value' => $this->getValue('fabpot', 1)));
+        $this->assertEquals('Hello asm89!', $rendered2);
+    }
+
+    protected function createTwig($cacheStrategyName = null)
+    {
+        $loader = new FilesystemLoader(__DIR__ . '/fixtures/');
+        $twig   = new Environment($loader);
+
+        $cacheExtension = new Extension($this->createCacheStrategy($cacheStrategyName));
+
+        $twig->addExtension($cacheExtension);
+
+        return $twig;
     }
 
     protected function createCacheStrategy($name = null)
@@ -42,13 +59,22 @@ class FunctionalExtensionTest extends \PHPUnit_Framework_TestCase
             case 'time':
                 return new LifetimeCacheStrategy($cacheProvider);
             case 'indexed':
-                return new IndexedChainingCacheStrategy(array(
-                    'gcs'  => new GenerationalCacheStrategy($cacheProvider, $keyGenerator, $lifetime),
-                    'time' => new LifetimeCacheStrategy($cacheProvider),
-                ));
+                return new IndexedChainingCacheStrategy(
+                    array(
+                        'gcs'  => new GenerationalCacheStrategy($cacheProvider, $keyGenerator, $lifetime),
+                        'time' => new LifetimeCacheStrategy($cacheProvider),
+                    )
+                );
             default:
                 return new GenerationalCacheStrategy($cacheProvider, $keyGenerator, $lifetime);
         }
+    }
+
+    protected function createCacheProvider()
+    {
+        $this->cache = new ArrayCache();
+
+        return new DoctrineCacheAdapter($this->cache);
     }
 
     protected function createKeyGenerator()
@@ -56,32 +82,9 @@ class FunctionalExtensionTest extends \PHPUnit_Framework_TestCase
         return new KeyGenerator();
     }
 
-    protected function createTwig($cacheStrategyName = null)
-    {
-        $loader = new Twig_Loader_Filesystem(__DIR__ . '/fixtures/');
-        $twig = new Twig_Environment($loader);
-
-        $cacheExtension = new Extension($this->createCacheStrategy($cacheStrategyName));
-
-        $twig->addExtension($cacheExtension);
-
-        return $twig;
-    }
-
     protected function getValue($value, $updatedAt)
     {
         return new Value($value, $updatedAt);
-    }
-
-    public function testCachesWithSameCacheKey()
-    {
-        $twig = $this->createTwig();
-
-        $rendered = $twig->render('gcs_value.twig', array('value' => $this->getValue('asm89', 1)));
-        $this->assertEquals('Hello asm89!', $rendered);
-
-        $rendered2 = $twig->render('gcs_value.twig', array('value' => $this->getValue('fabpot', 1)));
-        $this->assertEquals('Hello asm89!', $rendered2);
     }
 
     public function testDifferentCacheOnDifferentAnnotation()
@@ -131,7 +134,7 @@ class FunctionalExtensionTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @expectedException Twig_Error_Runtime
+     * @expectedException \Twig\Error\RuntimeError
      * @expectedExceptionMessage An exception has been thrown during the rendering of a template ("No strategy key found in value.")
      */
     public function testIndexedChainingStrategyNeedsKey()
@@ -145,7 +148,10 @@ class FunctionalExtensionTest extends \PHPUnit_Framework_TestCase
     {
         $twig = $this->createTwig('indexed');
 
-        $rendered = $twig->render('annotation_expression.twig', array('value' => $this->getValue('asm89', 1), 'version' => 1));
+        $rendered = $twig->render(
+            'annotation_expression.twig',
+            array('value' => $this->getValue('asm89', 1), 'version' => 1)
+        );
         $this->assertEquals('Hello asm89!Hello asm89!', $rendered);
     }
 }

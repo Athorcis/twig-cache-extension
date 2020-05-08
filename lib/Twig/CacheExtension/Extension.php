@@ -11,12 +11,15 @@
 
 namespace Twig\CacheExtension;
 
+use Twig\Environment;
+use Twig\Extension\AbstractExtension;
+
 /**
  * Extension for caching template blocks with twig.
  *
  * @author Alexander <iam.asm89@gmail.com>
  */
-class Extension extends \Twig_Extension
+class Extension extends AbstractExtension
 {
     private $cacheStrategy;
 
@@ -36,15 +39,9 @@ class Extension extends \Twig_Extension
         return $this->cacheStrategy;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getName()
     {
-        if (version_compare(\Twig_Environment::VERSION, '1.26.0', '>=')) {
-            return __CLASS__;
-        }
-        return 'twig_cache';
+        return __CLASS__;
     }
 
     /**
